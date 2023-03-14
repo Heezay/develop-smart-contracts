@@ -12,6 +12,26 @@ mod erc20 {
         balances: Mapping<AccountId, Balance>,
     }
 
+    #[ink(event)]
+    pub struct Transfer {
+        #[ink(topic)]
+        from: Option<AccountId>,
+        #[ink(topic)]
+        to: Option<AccountId>,
+        #[ink(topic)]
+        value: Balance,
+    }
+
+    #[ink(event)]
+    pub struct Approval {
+        #[ink(topic)]
+        owner: AccountId,
+        #[ink(topic)]
+        spender: AccountId,
+        #[ink(topic)]
+        value: Balance,
+    }
+
     /// Specify ERC-20 error type.
     #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -30,6 +50,12 @@ mod erc20 {
             let mut balances = Mapping::default();
             let caller = Self::env().caller();
             balances.insert(caller, &total_supply);
+
+            Self::env().emit_event(Transfer {
+                from: None,
+                to: Some(caller),
+                value: total_supply,
+            });
 
             Self {
                 total_supply,
@@ -72,6 +98,12 @@ mod erc20 {
             // Update the receiver's balance.
             let to_balance = self.balance_of(*to);
             self.balances.insert(&to, &(to_balance + value));
+
+            self.env().emit_event(Transfer {
+                from: Some(*from),
+                to: Some(*to),
+                value,
+            });
 
             Ok(())
         }
