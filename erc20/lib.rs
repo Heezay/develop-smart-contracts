@@ -10,6 +10,8 @@ mod erc20 {
         total_supply: Balance,
         /// The balance of each user.
         balances: Mapping<AccountId, Balance>,
+        /// Approval spender on behalf of the message's sender.
+        allowances: Mapping<(AccountId, AccountId), Balance>,
     }
 
     #[ink(event)]
@@ -38,6 +40,8 @@ mod erc20 {
     pub enum Error {
         /// Returned if not enough balance to fulfill a request is available.
         InsufficientBalance,
+        /// Returned if not enough allowance to fulfill a request is available.
+        InsufficientAllowance,
     }
 
     /// Specify the ERC-20 result type.
@@ -60,6 +64,7 @@ mod erc20 {
             Self {
                 total_supply,
                 balances,
+                allowances: Default::default(),
             }
         }
 
@@ -107,6 +112,50 @@ mod erc20 {
 
             Ok(())
         }
+
+        /// Transfers tokens on the behalf of the `from` account to the `to account
+        #[ink(message)]
+        pub fn transfer_from(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            value: Balance,
+        ) -> Result<()> {
+            // Ensure that a sufficient allowance exists.
+            let caller = self.env().caller();
+            let allowance = self.allowance(from.clone(), caller.clone());
+            if allowance < value {
+                return Err(Error::InsufficientAllowance);
+            }
+
+            self.transfer_from_to(&from, &to, value)?;
+
+            // Decrease the value of the allowance and transfer the tokens.
+            self.allowances.insert((from, caller), &(allowance - value));
+
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn approve(&mut self, spender: AccountId, value: Balance) -> Result<()> {
+            // Record the new allowance.
+            let owner = self.env().caller();
+            self.allowances.insert(&(owner, spender), &value);
+
+            // Notify offchain users of the approval and report success.
+            self.env().emit_event(Approval {
+                owner,
+                spender,
+                value,
+            });
+
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn allowance(&self, owner: AccountId, spender: AccountId) -> Balance {
+            self.allowances.get((owner, spender)).unwrap_or_default()
+        }
     }
 
     #[cfg(test)]
@@ -147,6 +196,31 @@ mod erc20 {
             assert!(contract.transfer(bob(), 10).is_ok());
             assert_eq!(contract.balance_of(bob()), 10);
             assert!(contract.transfer(bob(), 100).is_err());
+        }
+
+        #[ink::test]
+        fn transfer_from_works() {
+            let mut contract = Erc20::new(100);
+            assert_eq!(contract.balance_of(alice()), 100);
+            let _ = contract.approve(alice(), 20);
+            let _ = contract.transfer_from(alice(), bob(), 10);
+            assert_eq!(contract.balance_of(bob()), 10);
+        }
+
+        #[ink::test]
+        fn allowances_works() {
+            let mut contract = Erc20::new(100);
+            assert_eq!(contract.balance_of(alice()), 100);
+            let _ = contract.approve(alice(), 200);
+            assert_eq!(contract.allowance(alice(), alice()), 200);
+
+            assert!(contract.transfer_from(alice(), bob(), 50).is_ok());
+            assert_eq!(contract.balance_of(bob()), 50);
+            assert_eq!(contract.allowance(alice(), alice()), 150);
+
+            assert!(contract.transfer_from(alice(), bob(), 100).is_err());
+            assert_eq!(contract.balance_of(bob()), 50);
+            assert_eq!(contract.allowance(alice(), alice()), 150);
         }
     }
 }
