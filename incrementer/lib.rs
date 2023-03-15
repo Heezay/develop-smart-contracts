@@ -6,11 +6,14 @@ mod incrementer {
 
     #[ink(storage)]
     pub struct Incrementer {
+        /// The incrementer value.
         value: i32,
+        /// A mapping of key-value pairs
         my_map: Mapping<AccountId, i32>,
     }
 
     impl Incrementer {
+        /// Create a new Incrementer contract with an initial supply.
         #[ink(constructor)]
         pub fn new(init_value: i32) -> Self {
             let mut my_map = Mapping::default();
@@ -23,6 +26,7 @@ mod incrementer {
             }
         }
 
+        /// Returns default state for new incrementer instance.
         #[ink(constructor)]
         pub fn default() -> Self {
             Self {
@@ -31,11 +35,13 @@ mod incrementer {
             }
         }
 
+        /// Increment value by `i32` predicate. 
         #[ink(message)]
         pub fn inc(&mut self, by: i32) {
             self.value += by;
         }
 
+        /// Allows the contract caller to get the `my_map` storage item and insert an incremented `value` into the mapping.
         #[ink(message)]
         pub fn inc_mine(&mut self, by: i32) {
             let caller = self.env().caller();
@@ -43,17 +49,20 @@ mod incrementer {
             self.my_map.insert(caller, &(my_value + by));
         }
 
+        /// Returns the data of `value` with `i32` type.
         #[ink(message)]
         pub fn get(&self) -> i32 {
             self.value
         }
 
+        /// Read `my_map` using the Mapping API's `get()` method and return `my_map` for the contract caller.
         #[ink(message)]
         pub fn get_mine(&self) -> i32 {
             let caller = self.env().caller();
             self.my_map.get(&caller).unwrap_or_default()
         }
 
+        /// Allows the contract caller to clear the `my_map` storage item from storage.
         #[ink(message)]
         pub fn remove_mine(&self) {
             let caller = self.env().caller();

@@ -4,6 +4,9 @@
 mod erc20 {
     use ink::storage::Mapping;
 
+    /// Specify the ERC-20 result type.
+    pub type Result<T> = core::result::Result<T, Error>;
+
     #[ink(storage)]
     pub struct Erc20 {
         /// The total supply.
@@ -13,39 +16,6 @@ mod erc20 {
         /// Approval spender on behalf of the message's sender.
         allowances: Mapping<(AccountId, AccountId), Balance>,
     }
-
-    #[ink(event)]
-    pub struct Transfer {
-        #[ink(topic)]
-        from: Option<AccountId>,
-        #[ink(topic)]
-        to: Option<AccountId>,
-        #[ink(topic)]
-        value: Balance,
-    }
-
-    #[ink(event)]
-    pub struct Approval {
-        #[ink(topic)]
-        owner: AccountId,
-        #[ink(topic)]
-        spender: AccountId,
-        #[ink(topic)]
-        value: Balance,
-    }
-
-    /// Specify ERC-20 error type.
-    #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
-    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
-    pub enum Error {
-        /// Returned if not enough balance to fulfill a request is available.
-        InsufficientBalance,
-        /// Returned if not enough allowance to fulfill a request is available.
-        InsufficientAllowance,
-    }
-
-    /// Specify the ERC-20 result type.
-    pub type Result<T> = core::result::Result<T, Error>;
 
     impl Erc20 {
         /// Create a new ERC-20 contract with an initial supply.
@@ -80,12 +50,14 @@ mod erc20 {
             self.balances.get(&owner).unwrap_or_default()
         }
 
+        /// Transfer the balance to another account.
         #[ink(message)]
         pub fn transfer(&mut self, to: AccountId, value: Balance) -> Result<()> {
             let from = self.env().caller();
             self.transfer_from_to(&from, &to, value)
         }
 
+        /// Transfer the balance from one account to another.
         fn transfer_from_to(
             &mut self,
             from: &AccountId,
@@ -136,6 +108,7 @@ mod erc20 {
             Ok(())
         }
 
+        /// Approve balance that spender can take.
         #[ink(message)]
         pub fn approve(&mut self, spender: AccountId, value: Balance) -> Result<()> {
             // Record the new allowance.
@@ -152,10 +125,41 @@ mod erc20 {
             Ok(())
         }
 
+        /// Returns balance that approved spender on behalf of the message's sender
         #[ink(message)]
         pub fn allowance(&self, owner: AccountId, spender: AccountId) -> Balance {
             self.allowances.get((owner, spender)).unwrap_or_default()
         }
+    }
+
+    #[ink(event)]
+    pub struct Transfer {
+        #[ink(topic)]
+        from: Option<AccountId>,
+        #[ink(topic)]
+        to: Option<AccountId>,
+        #[ink(topic)]
+        value: Balance,
+    }
+
+    #[ink(event)]
+    pub struct Approval {
+        #[ink(topic)]
+        owner: AccountId,
+        #[ink(topic)]
+        spender: AccountId,
+        #[ink(topic)]
+        value: Balance,
+    }
+
+    /// Specify ERC-20 error type.
+    #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub enum Error {
+        /// Returned if not enough balance to fulfill a request is available.
+        InsufficientBalance,
+        /// Returned if not enough allowance to fulfill a request is available.
+        InsufficientAllowance,
     }
 
     #[cfg(test)]
